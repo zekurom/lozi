@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Search Example</title>
+    <link rel="stylesheet" type="text/css" href="index.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body>
+    <h1>Search</h1>
+    <div class="dropdown">
+        <button class="menu-button">Menu</button>
+        <div class="dropdown-content">
+            <a class="dropdown-item" href="/">Home</a>
+            <a class="dropdown-item" href="/anim">Docs</a>
+        </div>
+    </div>
+    <input type="text" id="search-input" placeholder="Search...">
+    <div id="search-results">
+    </div>
+
+
+
+    <script>
+        const socket = io();
+
+        (function () {
+            var cors_api_host = 'cors-anywhere.herokuapp.com';
+            var cors_api_url = 'https://' + cors_api_host + '/';
+            var slice = [].slice;
+            var origin = window.location.protocol + '//' + window.location.host;
+            var open = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function () {
+                var args = slice.call(arguments);
+                var targetOrigin = /^https?:\/\/([^\/]+)/i.exec(args[1]);
+                if (targetOrigin && targetOrigin[0].toLowerCase() !== origin &&
+                    targetOrigin[1] !== cors_api_host) {
+                    args[1] = cors_api_url + args[1];
+                }
+                return open.apply(this, args);
+            };
+        })();
+
+        $('#search-input').keypress(function (event) {
+            if (event.keyCode === 13) {
+                const query = $('#search-input').val();
+                socket.emit('search', query);
+            }
+        });
+
+        socket.on('search-results', function (data) {
+            $('#search-results').empty();
+
+            if (data.error) {
+                $('#search-results').append($('<p>').text(data.error));
+            } else {
+                data.forEach(function (result) {
+                    // const link = document.createElement('a');
+                    // link.href = result.link;
+                    // link.classList.add('link');
+
+
+                    let firstIndex = result.indexOf("<a href=\"");
+                    //console.log(firstIndex)
+                    let lastIndex = result.indexOf("/\" title");
+                    //console.log(lastIndex)
+
+                    let str = result.slice(firstIndex, lastIndex + 1);
+                    const text = document.createTextNode(str.slice(0, -4));
+                    //console.log(result)
+                    //link.appendChild(text);
+
+                    const p = document.createElement('p');
+                    p.style = "min-width:500px; max-width:500px;"
+                    p.classList.add('rectangle');
+                    let a = new DOMParser().parseFromString(result, "text/html");
+                    let link = a.querySelector("a");
+                    let href = link.href
+                    link.removeAttribute('href')
+                    link.innerText = link.title
+                    p.appendChild(link);
+
+                    const icon = document.createElement('img');
+                    let firstIndex2 = result.indexOf("<img");
+                    let lastIndex2 = result.indexOf("/>");
+                    let str2 = result.slice(firstIndex2, lastIndex2 + 2);
+                    let imgDOM = new DOMParser().parseFromString(str2, "text/html");
+                    let img = imgDOM.querySelector("img")
+                    if (img) {
+                        let xhr = new XMLHttpRequest();
+                        xhr.open("GET", img.src, true)
+                        xhr.responseType = "blob"
+                        xhr.onload = function () {
+                            if (this.status == 200) {
+                                let blob = this.response;
+                                icon.src = URL.createObjectURL(blob);
+                            }
+                        }
+                        xhr.send();
+                    }
+
+                    icon.alt = 'Icon';
+                    icon.classList.add('icon');
+                    icon.style = "max-height:70px; max-width:70px;"
+                    icon.style.float = 'right'
+                    icon.style.display = 'inline-block'
+                    icon.style.position = 'absolute'
+                    icon.style.top = '0'
+                    icon.style.right = '0'
+                    link.appendChild(icon);
+
+                    p.addEventListener("click", function () {
+                        $('#search-results').empty();
+                        // let xhr = new XMLHttpRequest();
+                        // xhr.open("GET", href, true)
+                        // xhr.responseType = "blob"
+                        // xhr.onload = function () {
+                        //     if (this.status == 200) {
+                        //         let blob = this.response;
+                        //         let iframe = document.createElement("iframe");
+                        //         iframe.src = URL.createObjectURL(blob)
+                        //         iframe.width = "500px"
+                        //         iframe.height = "1000px"
+                        //         $('#search-results').append($(iframe));
+                        //     }
+                        // }
+                        // xhr.send();
+                        socket.emit('subsearch', href)
+
+                    })
+
+                    $('#search-results').append($(p));
+                });
+            }
+        });
+
+        socket.on('subsearchresults', function (data) {
+            $('#search-results').empty();
+
+            if (data.error) {
+                $('#search-results').append($('<p>').text(data.error));
+            } else {
+                data.forEach(function (result) {
+                    result = result.replace('<p style="text-align: center;">', '')
+                    console.log(result)
+                    //let firstIndex = result.indexOf("<a href=\"");
+                    //console.log(firstIndex)
+                    //let lastIndex = result.indexOf("/\" title");
+                    //console.log(lastIndex)
+
+                    //let str = result.slice(firstIndex, lastIndex + 1);
+                    //const text = document.createTextNode(str.slice(0, -4));
+                    //link.appendChild(text);
+
+                    const p = document.createElement('p');
+                    p.style = "min-width:500px; max-width:500px;"
+                    p.classList.add('rectangle');
+                    let a = new DOMParser().parseFromString(result, "text/html");
+                    let link = a.querySelector("a");
+                    //let href = link.href
+                    //link.removeAttribute('href')
+                    link.innerText = link.title
+                    p.appendChild(link);
+
+                    $('#search-results').append($(p));
+                })
+            }
+        })
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function (event) {
+            var dropdown = document.querySelector(".dropdown");
+            dropdown.addEventListener("click", function () {
+                dropdown.classList.toggle("active");
+            });
+        });
+    </script>
+</body>
+
+</html>
