@@ -1,10 +1,12 @@
 const express = require('express');
 const app = express();
+const path = require('path')
 const server = require('http').createServer(app);
 const io = require('socket.io')(server);
 const axios = require('axios');
 const { MeiliSearch } = require('meilisearch');
 const { query } = require('express');
+const Zoro = require(path.resolve('./zoro-to-api'));
 
 const client = new MeiliSearch({
     host: 'https://search.rezi.one/',
@@ -109,12 +111,30 @@ io.on('connection', (socket) => {
             });
     })
 
-    socket.on('animsearch', (query) => {
-        
+    socket.on('animsearch', async (query) => {
 
+        let zoroResults = await Zoro.zoroSearch("query")
+        let firstResult = zoroResults[0]
+        let info = Zoro.getAnimeInfoByName(firstResult.eng_title); 
+        let { episodes } = await Zoro.getEpList(firstResult.id);
 
-        console.log(results)
+        let results = JSON.parse(```
+        {
+            'Title': ${firstResult.eng_title},
+            'Banner': ${info.source}
+            'Episodes': ${episodes},
+        }
+        ```)
+
+        //console.log(results)
         socket.emit('animsearchresults', results)
+    })
+
+    socket.on('animplay', async (anid, epi, serv, subdub) => {
+        let { episodes } = await Zoro.getEpList(anid);
+        let servers = await Zoro.getEpisodeServers(episodes[epi])
+        let iframedata = await Zoro.getStreamsById(servers[`servers${subdub}`][0][serv]); // Getting the iframe embed URL
+        console.log(iframedata.link); // Logging the iframe embed URL
     })
 });
 
